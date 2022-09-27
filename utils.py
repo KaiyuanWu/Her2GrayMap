@@ -22,7 +22,7 @@ def kmeans_cluster(patch_luv,
     return kmeans, index
 
 
-def _get_membrane(patch, **kwargs):
+def get_membrane(patch, **kwargs):
     patch_luv = cv2.cvtColor(patch, cv2.COLOR_RGB2LUV)
     membrane_mask = np.zeros((patch_luv.shape[0], patch_luv.shape[1]), dtype=np.uint8)
     kmeans_model, cluster_index = kmeans_cluster(patch_luv, **kwargs)
@@ -40,3 +40,4 @@ def _get_membrane(patch, **kwargs):
         membrane_cluster_idx = membrane_candidates[-1]
         membrane_mask = np.array((cluster_index == membrane_cluster_idx) & (patch_luv[..., 0] > 0), dtype=np.uint8) * 255
     return membrane_mask, membrane_cluster_idx
+
