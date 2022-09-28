@@ -24,13 +24,13 @@
    
 3. Train Multi-task classification model
 ```bash
-  python train.py
+  export CUDA_VISIBLE_DEVICES=0
+  python train.py configs/her2graymap.py  --no-validate
 ```
 
 4. Evaluate Model Performance
 ```bash
-  python test.py --eval
+  export CUDA_VISIBLE_DEVICES=0
+  python train.py configs/her2graymap.py  --no-validate
 ```
-
-5. Model Inference
 

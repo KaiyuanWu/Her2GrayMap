@@ -60,6 +60,22 @@ class WSIDataset():
             lbl_infos[row['slide_bn']] = {'ihc': row['ihc'], 'fish': row['fish']}
         return lbl_infos
 
+    def _correct_annotation_shift(self, annos, slide_fn):
+        slide = openslide.OpenSlide(slide_fn)
+        bounds_x, bounds_y = float(slide.properties['openslide.bounds-x']), float(slide.properties['openslide.bounds-y'])
+        bounds = np.array([[bounds_x, bounds_y]])
+        for anno in annos:
+            properties, geometry = anno.get("properties", {}), anno.get("geometry", {})
+            geometry_type, coordinates = geometry.get("type", ""), geometry.get("coordinates")
+            if geometry_type == 'LineString':
+                coordinates = np.array(coordinates) + bounds
+                geometry['coordinates'] = coordinates.astype(np.int32).tolist()
+            else:
+                for poly_idx, poly in enumerate(coordinates):
+                    poly = np.array(poly) + bounds
+                    coordinates[poly_idx] = poly.astype(np.int32).tolist()
+        return annos
+
     def _build_data_info(self):
         data_infos = []
         for slide_fn in self._slides:
@@ -69,6 +85,8 @@ class WSIDataset():
                       'slide_bn': slide_bn,
                       'annos': self._annos.get(slide_bn, {}).get("features", []),
                       'lbls': self._lbl_infos.get(slide_bn, {})}
+            sample['annos'] = self._correct_annotation_shift(annos=sample['annos'],
+                                           slide_fn=sample['slide_fn'])
             if self._mode == 'train':
                 if len(sample['lbls']) > 0:
                     data_infos.append(sample)
@@ -154,24 +172,3 @@ class HER2Classification(CustomDataset):
             return len(self._cat_ids)*max([len(self._cat_ids[k]) for k in self._cat_ids])
         else:
             return len(self.data_infos)
-
-    def evaluate(self,
-                 results,
-                 metric='her2_accuracy', **kwargs):
-
-        if metric != 'her2_accuracy':
-            return super(HER2Classification, self).evaluate(results, metric=metric, **kwargs)
-        eval_results = OrderedDict()
-        all_results, all_preds, all_labels = [], [], []
-        for task_idx in range(len(self.keep_labels)):
-            keep_label = self.keep_labels[task_idx]
-            task_results = [results[i] for i in range(len(results)) if i%len(self.keep_labels) == task_idx]
-            task_results = torch.stack(task_results).detach().cpu().numpy().squeeze(axis=1)
-            preds = np.argmax(task_results, axis=1)
-            labels = np.array([item['ann'][keep_label] for item in self.data_infos])
-            eval_results[f"{keep_label}_acc"] = np.sum(preds == labels) / labels.shape[0]
-            all_preds.append(preds)
-            all_results.append(task_results.tolist())
-            all_labels.append(labels)
-        return eval_results
-
